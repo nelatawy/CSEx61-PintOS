@@ -306,6 +306,22 @@ cond_wait (struct condition *cond, struct lock *lock)
   lock_acquire (lock);
 }
 
+/* Returns true if priority of thread in the waiter A is less 
+   than the priority of thread in the waiter B, false otherwise. */
+static bool
+semaphore_elem_priority_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct semaphore_elem *a = list_entry (a_, struct semaphore_elem, elem);
+  const struct semaphore_elem *b = list_entry (b_, struct semaphore_elem, elem);
+  
+  /* This is safe, since there is always exactly one thread waiting on 
+     the semaphore of the semaphore element, as long as it's in the 
+     waiters list of the condition variable. */
+  return list_entry (list_front (&a->semaphore.waiters), struct thread, elem)->priority 
+    < list_entry (list_front (&b->semaphore.waiters), struct thread, elem)->priority;
+}
+
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -321,9 +337,14 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
-    sema_up (&list_entry (list_pop_front (&cond->waiters),
-                          struct semaphore_elem, elem)->semaphore);
+  if (!list_empty (&cond->waiters))
+    {
+      /* Get the semaphore whose thread has the highest priority and 
+         removes it from the waiters and wakes the thread. */
+      struct list_elem *max = list_max (&cond->waiters, semaphore_elem_priority_less, NULL);
+      list_remove (max);
+      sema_up (&list_entry (max, struct semaphore_elem, elem)->semaphore);
+    }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

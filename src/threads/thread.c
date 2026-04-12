@@ -496,8 +496,8 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
-/* Returns true if priority of thread A is less than the priority of thread B, false
-   otherwise. */
+/* Returns true if priority of thread A is less than the priority
+   of thread B, false otherwise. */
 bool
 thread_priority_less (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
@@ -508,8 +508,8 @@ thread_priority_less (const struct list_elem *a_, const struct list_elem *b_,
   return a->priority < b->priority;
 }
 
-/* Returns true if priority of thread A is greater than the priority of thread B, false
-   otherwise. */
+/* Returns true if priority of thread A is greater than the priority 
+   of thread B, false otherwise. */
 bool
 thread_priority_greater (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
