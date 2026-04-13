@@ -201,10 +201,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  if (priority > thread_current()->priority) {
-    thread_yield();
-  }
-
+  // if ( priority > thread_current()->priority) {
+  //   thread_yield();
+  // }
+  
+ thread_maybe_yield();
   return tid;
 }
 
@@ -363,13 +364,15 @@ thread_set_priority (int new_priority)
   struct thread *cur = thread_current ();
   
 //???????????????????????
-  if (thread_mlfqs)
-    return;
+  // if (thread_mlfqs)
+  //   return;
 
   cur->base_priority = new_priority;
   //as orginal priority new may be more than the effective priority 
-  thread_refresh_priority (cur);
+  // thread_refresh_priority (cur);
   //as may be in ready list one with more priority 
+  // this wrong  we must call thread_refresh_priority but i not impl it yet
+  cur->priority=new_priority;
   thread_maybe_yield ();
 }
 

@@ -135,9 +135,12 @@ sema_up (struct semaphore *sema)
 //make it null now and in unblock will make it ready
       t->current_list = NULL;
       thread_unblock (t);
+
     }
   sema->value++;
   intr_set_level (old_level);
+      thread_maybe_yield ();
+
 }
 
 static void sema_test_helper (void *sema_);
