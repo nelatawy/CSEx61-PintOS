@@ -89,6 +89,12 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int base_priority;
+    struct list donations;
+    struct lock *waiting_lock;
+    struct list_elem donation_elem;
+
+    struct list *current_list;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
@@ -140,5 +146,19 @@ int thread_get_load_avg (void);
 
 bool thread_priority_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool thread_priority_greater (const struct list_elem *a, const struct list_elem *b, void *aux);
+/*we need this in remaintain the lists to keep it order */
+void thread_reinsert_in_current_list (struct thread *t);
 
+/*this for compare but take what in donation list what in ready and waiting list*/
+bool donation_priority_more (const struct list_elem *a,
+                        const struct list_elem *b,
+                        void *aux );
+//this for update the priority
+void thread_refresh_priority (struct thread *t);
+//this for make donate
+void thread_donate_chain (struct thread *t);
+//this for 
+void thread_remove_donations_for_lock (struct lock *lock);
+//this to check there is thread with high priority in ready list so block this and start to choose again 
+void thread_maybe_yield (void);
 #endif /* threads/thread.h */
