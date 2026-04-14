@@ -218,9 +218,29 @@ lock_acquire (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+ struct thread *cur = thread_current ();
+
+  if (lock->holder != NULL )
+    {
+      // make this thread wating in this lock 
+      cur->waiting_lock = lock; 
+//inset in lock holder thread this donation in order (see here we insert in order but in 
+// refresh we resort or get max this because the priority of donatinion can be change in list
+// and this will destroy order )
+//so we can remove this and insert not inorder ____________________________________________
+      list_insert_ordered (&lock->holder->donations,
+                           &cur->donation_elem,
+                           donation_priority_more,
+                           NULL);
+//make the realy donation 
+      thread_donate_chain (cur);
+    }
 
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+
+  cur->waiting_lock = NULL;
+  lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -254,8 +274,17 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  //first make release donations to this lock because this lock 
+      thread_remove_donations_for_lock (lock);
+// recompute the priority of the current thread which make release to lock 
+
+      thread_refresh_priority (thread_current ());
+    
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
+  
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -384,4 +413,50 @@ cond_broadcast (struct condition *cond, struct lock *lock)
 
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
+}
+
+
+
+void
+thread_donate_chain (struct thread *t)
+{
+  int depth = 0;
+  struct lock *lock = t->waiting_lock;
+// we make the depth here =8 we can change it to any number 
+  while (lock != NULL && lock->holder != NULL && depth < 8)
+    {
+      struct thread *holder = lock->holder;
+
+      if (holder->priority < t->priority)
+        {
+          // make donation and change the priotrity 
+          holder->priority = t->priority;
+          // this to maintain the list ordered
+          thread_reinsert_in_current_list (holder);
+        }
+
+      t = holder;
+      lock = t->waiting_lock;
+      depth++;
+    }
+}
+
+void
+thread_remove_donations_for_lock (struct lock *lock)
+{
+  // this is the thread which make release to lock 
+  struct thread *cur = thread_current ();
+  // e first element in donations list which is list mean thread make donations to me 
+  struct list_elem *e = list_begin (&cur->donations);
+
+  while (e != list_end (&cur->donations))
+    {
+      struct thread *donor = list_entry (e, struct thread, donation_elem);
+      struct list_elem *next = list_next (e);
+// remove from this list any thread make donation for this thread because this lock 
+      if (donor->waiting_lock == lock)
+        list_remove (e);
+
+      e = next;
+    }
 }

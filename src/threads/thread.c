@@ -369,10 +369,10 @@ thread_set_priority (int new_priority)
 
   cur->base_priority = new_priority;
   //as orginal priority new may be more than the effective priority 
-  // thread_refresh_priority (cur);
+  thread_refresh_priority (cur);
   //as may be in ready list one with more priority 
   // this wrong  we must call thread_refresh_priority but i not impl it yet
-  cur->priority=new_priority;
+  // cur->priority=new_priority;
   thread_maybe_yield ();
 }
 
@@ -713,7 +713,32 @@ thread_maybe_yield (void)
 
 
 
+void
+thread_refresh_priority (struct thread *t)
+{
+  int old_priority;
 
+  ASSERT (t != NULL);
+
+  old_priority = t->priority;
+  t->priority = t->base_priority;
+
+  if (!list_empty (&t->donations))
+    {
+      // we can make it not resort we can make it extract max and make helpe  method
+      list_sort (&t->donations, donation_priority_more, NULL);
+
+      struct thread *donor =
+          list_entry (list_front (&t->donations), struct thread, donation_elem);
+
+      if (donor->priority > t->priority)
+        t->priority = donor->priority;
+    }
+//her to track the list which this thread in it ready or waiting list and update its place so the list will 
+// be still sorted 
+  if (t->priority != old_priority)
+    thread_reinsert_in_current_list (t);
+}
 
 
 
