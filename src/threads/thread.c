@@ -11,6 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed-point.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -19,6 +21,8 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+
+#define DEBUG false
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -57,6 +61,8 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
+int load_avg;
+
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
@@ -86,7 +92,10 @@ static tid_t allocate_tid (void);
    finishes. */
 void
 thread_init (void) 
-{
+{ 
+  
+  // printf("Threads starting\n\n");
+
   ASSERT (intr_get_level () == INTR_OFF);
 
   lock_init (&tid_lock);
@@ -95,9 +104,19 @@ thread_init (void)
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
+  
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
-  initial_thread->tid = allocate_tid ();
+  initial_thread->tid = allocate_tid ();  
+  if (DEBUG)
+  {
+    printf("created initial thread");
+  }
+  
+  if (thread_mlfqs){
+    load_avg = 0;
+    initial_thread->recent_cpu = 0;
+  }
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -107,6 +126,7 @@ thread_start (void)
 {
   /* Create the idle thread. */
   struct semaphore idle_started;
+  
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
 
@@ -134,6 +154,55 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  if (thread_mlfqs)
+  {
+
+    if (timer_ticks() % TIMER_FREQ == 0) // multiples of a second
+    {
+      //recompute the system/thread metrics
+      // printf("Updating load avg\n\n");
+        if (DEBUG)
+      {
+        // printf("recomputing load avg from %d\n", load_avg);
+      }
+      recompute_load_avg();
+        if (DEBUG)
+      {
+        // printf("recomputed load avg to %d\n", load_avg);
+      }
+      thread_foreach(recompute_recent_cpu, NULL);
+
+    }else{
+      t->recent_cpu += 100; // since it keeps track of 100x the recent cpu so an increment is +100
+      if (DEBUG)
+      {
+        printf("incrementing recent cpu of %s to %d\n",t->name, t->recent_cpu);
+      }
+    }
+
+    // if (timer_ticks() % (2*TIMER_FREQ) == 0 && DEBUG)
+    // {
+    //   printf("recent_cpu * 100 : %d, load avg * 100 : %d\n", t->recent_cpu, load_avg);
+    // }
+    
+    if (timer_ticks() % 4 == 0) //every fourth tick
+    {
+
+      thread_foreach(recompute_dynamic_priority, NULL);
+      thread_foreach(thread_reinsert_in_current_list, NULL); // to correct the order
+      if (!list_empty(&ready_list))
+      {
+        struct thread *next_ready = list_entry (list_front(&ready_list), struct thread, elem);
+        if (DEBUG)
+        {
+          // printf("rescheduling to %s\n", next_ready->name);
+        }
+        if (thread_priority_greater(next_ready, t,NULL))
+          intr_yield_on_return(); // to preempt current
+      }
+    }
+  }
+  
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
@@ -182,6 +251,21 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  if (DEBUG)
+  {
+    // printf("creating a thread\n");
+  }
+  
+  if (thread_mlfqs)
+  {
+     if (DEBUG)
+      {
+        // printf("inhereting recent cpu\n\n");
+      }
+    struct thread* parent_thread = thread_current();
+    t->recent_cpu = parent_thread->recent_cpu;
+  }
+  
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -359,7 +443,9 @@ thread_set_priority (int new_priority)
     // thread_yield();
 
   // intr_set_level (old_level);
-
+  if (thread_mlfqs)
+    return;
+  
 
   struct thread *cur = thread_current ();
   
@@ -376,8 +462,6 @@ thread_set_priority (int new_priority)
   thread_maybe_yield ();
 }
 
-
-
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
@@ -385,35 +469,124 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
+
+void 
+recompute_dynamic_priority(struct thread* t)
+{ 
+  //  if (DEBUG)
+  //     {
+  //       printf("recomputing dynamic priority\n\n");
+  //     }
+  // debug_backtrace();
+  // if (DEBUG)
+  // {
+  //   printf("recent cpu is %d\n by %s", t->recent_cpu, t->name);
+  // }
+  
+  int64_t recent_cpu_effect = div_fixed_int(
+    int_to_fixed_p(t->recent_cpu),
+    4); // since it's multiplied by 100
+  int64_t nice_effect = int_to_fixed_p(t->nice * 2);
+  t->priority = round_fixed(
+    sub_fixed_fixed(
+      sub_fixed_fixed(int_to_fixed_p(PRI_MAX), recent_cpu_effect),
+      nice_effect
+    ));
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  struct thread *cur = thread_current ();
+  cur->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
+  struct thread *cur = thread_current ();
+  if (cur->nice)
+    return cur->nice;
+  
   return 0;
 }
 
 /* Returns 100 times the system load average. */
+/*load_avg = (59/60)*load_avg + (1/60)*ready_threads*/
+/*load_avg * 100 = ((59 * 5)/3)*load_avg + (5/3)*ready_threads*/
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return (load_avg)?load_avg : 0;
+}
+
+void 
+recompute_load_avg(void)
+{
+  
+  // debug_backtrace();
+  // if (DEBUG)
+  //     {
+  //       printf("recomputing load avg\n");
+  //       printf("ready list size %d\n", list_size(&ready_list));
+  //       // printf("prev part of load avg %d\n", fixed_p_to_int(prev_part));
+  //       // printf("curr part of load avg %d\n", fixed_p_to_int(curr_part));
+  //       printf(" load avg %d\n", load_avg);
+  //       // debug_backtrace();
+  //     }
+  int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(load_avg),100);
+  int64_t prev_part = mult_fixed_int(
+      fixed_load_avg,59
+    );
+
+  int64_t curr_part = int_to_fixed_p(list_size(&ready_list) + (thread_current() != idle_thread));
+
+  load_avg = round_fixed(
+    mult_fixed_int(
+      div_fixed_int(add_fixed_fixed(prev_part, curr_part),60)
+    ,100)
+  );
+  
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  struct thread *cur = thread_current ();
+  return (cur->recent_cpu)?cur->recent_cpu : 0;
+}
+
+void 
+recompute_recent_cpu(struct thread* t)
+{ 
+
+  // debug_backtrace();
+  int64_t load_avg_fixed = div_fixed_int(int_to_fixed_p(load_avg),100); 
+  // since it was multiplied by 100
+
+  int64_t decay_factor = div_fixed_fixed(
+    mult_fixed_int(load_avg_fixed,2), 
+    add_fixed_int(mult_fixed_int(load_avg_fixed,2),1)
+  );
+  int64_t old_recent_cpu = div_fixed_int(int_to_fixed_p(t->recent_cpu), 100); 
+
+  int val = round_fixed(
+    mult_fixed_int(
+      add_fixed_int(
+        mult_fixed_fixed(decay_factor, old_recent_cpu),
+        // old_recent_cpu,
+        t->nice
+      ), 
+      100));
+      if (DEBUG)
+      { 
+        printf("old recent_cpu of %s is %d and 100x load avg factor is %d, 100x decay factor fixed\n\n",t->name, t->recent_cpu, round_fixed(mult_fixed_int(decay_factor, 100)));
+
+      }
+      t->recent_cpu = val;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -491,6 +664,10 @@ is_thread (struct thread *t)
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
+    if (DEBUG)
+  {
+    printf("initializing a thread\n");
+  }
   enum intr_level old_level;
 
   ASSERT (t != NULL);

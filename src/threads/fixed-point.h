@@ -32,3 +32,6 @@ int64_t mult_fixed_int(int64_t, int);
 int64_t div_fixed_int(int64_t, int);
 
 int round_fixed(int64_t);
+
+/* Test function for fixed-point arithmetic */
+void test_fixed_point(void);

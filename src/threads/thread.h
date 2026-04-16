@@ -98,6 +98,9 @@ struct thread
     int64_t wakeup_tick;                // to know at which tick the thread will wake up
     struct list_elem sleep_elem;        // list of sleeping threads where each new thread inserted based on its wakeup_tick
 
+    /* needed for mlfqs mode*/
+    int nice;
+    int recent_cpu;
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -140,11 +143,16 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void recompute_dynamic_priority(struct thread*);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
+
 int thread_get_recent_cpu (void);
+void recompute_recent_cpu (struct thread*);
+
 int thread_get_load_avg (void);
+void recompute_load_avg (void);
 
 bool thread_priority_less (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool thread_priority_greater (const struct list_elem *a, const struct list_elem *b, void *aux);
