@@ -6,32 +6,43 @@ This header file defines all the fixed-point operation's needed by the priority 
 
 #define F_BITS 14
 
-// conversions
-int64_t int_to_fixed_p(int);
-
-int fixed_p_to_int(int64_t);
 
 
+#define int_to_fixed_p(val) ((val >= 0)?((int64_t)val << F_BITS):-((int64_t)(-val) << F_BITS))
+#define fixed_p_to_int(val) (val >> F_BITS)
+#define round_fixed(val) ((val < 0)? -((-val + (1 << (F_BITS - 1))) >> F_BITS) :(val + (1 << (F_BITS - 1))) >> F_BITS)
+
+
+// --------
 // fixed-fixed operations
-int64_t add_fixed_fixed(int64_t, int64_t);
+//---------
 
-int64_t sub_fixed_fixed(int64_t, int64_t);
+// add-sub can be totally ignore but they were only added for completeness 
+// and also  to avoid using add,sub in a way diff from that of the mult,div
+#define add_fixed_fixed(first, second) (first + second)
+#define sub_fixed_fixed(first, second) (first - second)
 
-int64_t mult_fixed_fixed(int64_t, int64_t);
+#define mult_fixed_fixed(first, second) ((first * second) >> F_BITS)
+//     // example : 
+//     // (011 | 10) * (011 | 10) --> 3.5 * 3.5 = 12.25
+//     // it wil be 1100|0100 because on multiplying 2 binary numbers 
+//     // we place the fraction point at a distance equal to the sum of distances from lsb in both numbers
+//     // that it it takes 2 * F_BITS so we need to shift it back (right) by F_BITS to make it consistent again
 
-int64_t div_fixed_fixed(int64_t, int64_t);
+#define div_fixed_fixed(first, second) ((first << F_BITS) / second)
+//     // example :
+//     // (10101 | 00101) / (10101 | 00101)  (| : dictates the int-fraction seperator) 
+//     // this would be 00000 | 00001
+//     // but to make it correct -> 00001 | 00000 we need to shift by the F_BITS post division
+//     // but here we mustn't do the first/second first then shift because that would be just an integer divison result shifted
+//     // instead we should shift first then divide
 
 
-// fixed-int operations
-int64_t add_fixed_int(int64_t, int);
 
-int64_t sub_fixed_int(int64_t, int);
-
-int64_t mult_fixed_int(int64_t, int);
-
-int64_t div_fixed_int(int64_t, int);
-
-int round_fixed(int64_t);
-
-/* Test function for fixed-point arithmetic */
-void test_fixed_point(void);
+// // --------
+// // fixed-int operations
+// // --------
+#define add_fixed_int(first, second) (first + ((int64_t)second << F_BITS))
+#define sub_fixed_int(first, second) (first - ((int64_t)second << F_BITS))
+#define mult_fixed_int(first, second) (first * second)
+#define div_fixed_int(first, second) (first / second)

@@ -156,6 +156,12 @@ thread_tick (void)
 
   if (thread_mlfqs)
   {
+    if (t->priority > PRI_MAX)
+    {
+      update_dynamic_priority(t);
+      thread_maybe_yield();
+    }
+    
 
     if (timer_ticks() % TIMER_FREQ == 0) // multiples of a second
     {
@@ -188,18 +194,20 @@ thread_tick (void)
     if (timer_ticks() % 4 == 0) //every fourth tick
     {
 
-      thread_foreach(recompute_dynamic_priority, NULL);
-      thread_foreach(thread_reinsert_in_current_list, NULL); // to correct the order
-      if (!list_empty(&ready_list))
-      {
-        struct thread *next_ready = list_entry (list_front(&ready_list), struct thread, elem);
-        if (DEBUG)
-        {
-          // printf("rescheduling to %s\n", next_ready->name);
-        }
-        if (thread_priority_greater(next_ready, t,NULL))
-          intr_yield_on_return(); // to preempt current
-      }
+      thread_foreach(update_dynamic_priority, NULL);
+      list_sort(&ready_list, thread_priority_greater, NULL);
+      // thread_foreach(thread_reinsert_in_current_list, NULL); // to correct the order
+      thread_maybe_yield();
+      // if (!list_empty(&ready_list))
+      // {
+      //   struct thread *next_ready = list_entry (list_front(&ready_list), struct thread, elem);
+      //   if (DEBUG)
+      //   {
+      //     // printf("rescheduling to %s\n", next_ready->name);
+      //   }
+      //   if (thread_priority_greater(next_ready, t,NULL))
+      //     intr_yield_on_return(); // to preempt current
+      // }
     }
   }
   
@@ -264,6 +272,7 @@ thread_create (const char *name, int priority,
       }
     struct thread* parent_thread = thread_current();
     t->recent_cpu = parent_thread->recent_cpu;
+    t->priority = PRI_MAX + 1; 
   }
   
 
@@ -289,7 +298,7 @@ thread_create (const char *name, int priority,
   //   thread_yield();
   // }
   
- thread_maybe_yield();
+  thread_maybe_yield();
   return tid;
 }
 
@@ -471,7 +480,7 @@ thread_get_priority (void)
 
 
 void 
-recompute_dynamic_priority(struct thread* t)
+update_dynamic_priority(struct thread* t)
 { 
   //  if (DEBUG)
   //     {
@@ -493,6 +502,7 @@ recompute_dynamic_priority(struct thread* t)
       sub_fixed_fixed(int_to_fixed_p(PRI_MAX), recent_cpu_effect),
       nice_effect
     ));
+
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -575,7 +585,7 @@ recompute_recent_cpu(struct thread* t)
 
 
 
-  int64_t val =  (t->nice > 0)? add_fixed_int(recent_part, t->nice) : sub_fixed_int(recent_part, -t->nice) ;
+  int64_t val =  (t->nice >= 0)? add_fixed_int(recent_part, t->nice) : sub_fixed_int(recent_part, -t->nice) ;
       if (DEBUG)
       { 
         // printf("old load avg is %s  %ld %ld and decay f is %d\n",t->name, t->recent_cpu, load_avg, round_fixed(mult_fixed_int(decay_factor, 100)));
