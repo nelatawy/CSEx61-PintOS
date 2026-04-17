@@ -22,7 +22,7 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-#define DEBUG true
+#define DEBUG false
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -484,8 +484,9 @@ recompute_dynamic_priority(struct thread* t)
   // }
   
   int64_t recent_cpu_effect = div_fixed_int(
-    int_to_fixed_p(t->recent_cpu),
-    4); // since it's multiplied by 100
+    t->recent_cpu,
+    4); 
+
   int64_t nice_effect = int_to_fixed_p(t->nice * 2);
   t->priority = round_fixed(
     sub_fixed_fixed(
@@ -533,11 +534,12 @@ recompute_load_avg(void)
         // printf("ready list size %d\n", list_size(&ready_list));
         // printf("prev part of load avg %d\n", fixed_p_to_int(prev_part));
         // printf("curr part of load avg %d\n", fixed_p_to_int(curr_part));
-        // printf(" load avg %ld\n", load_avg);
+        // printf(" load avg %d\n", round_fixed(mult_fixed_int(load_avg,100)));
+        // printf("%ds", timer_ticks() / TIMER_FREQ);
         // debug_backtrace();
       }
   // int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(load_avg),100);
-  int64_t numer = add_fixed_int(mult_fixed_int(load_avg,59), (thread_current() != idle_thread));
+  int64_t numer = add_fixed_int(mult_fixed_int(load_avg,59),list_size(&ready_list) + (thread_current() != idle_thread));
 
   // int64_t curr_part = int_to_fixed_p(list_size(&ready_list) + (thread_current() != idle_thread));
 
@@ -573,11 +575,11 @@ recompute_recent_cpu(struct thread* t)
 
 
 
-  int64_t val =  add_fixed_int(recent_part, t->nice);
+  int64_t val =  (t->nice > 0)? add_fixed_int(recent_part, t->nice) : sub_fixed_int(recent_part, -t->nice) ;
       if (DEBUG)
       { 
         // printf("old load avg is %s  %ld %ld and decay f is %d\n",t->name, t->recent_cpu, load_avg, round_fixed(mult_fixed_int(decay_factor, 100)));
-        printf("recent part %ld\n\n", recent_part);
+        // printf("mult part %lld, nice is %d\n\n", mult_fixed_fixed(decay_factor, t->recent_cpu), t->nice);
 
       }
       t->recent_cpu = val;

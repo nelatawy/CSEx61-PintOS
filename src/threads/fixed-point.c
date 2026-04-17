@@ -4,7 +4,7 @@
 
 
 int64_t int_to_fixed_p(int val){
-    return (int64_t)val << F_BITS;
+    return (val >= 0)?((int64_t)val << F_BITS):-((int64_t)(-val) << F_BITS);
 }
 
 

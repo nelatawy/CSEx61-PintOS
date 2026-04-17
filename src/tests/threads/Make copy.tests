@@ -51,3 +51,19 @@ tests/threads/mlfqs-block.output
 $(MLFQS_OUTPUTS): KERNELFLAGS += -mlfqs
 $(MLFQS_OUTPUTS): TIMEOUT = 480
 
+
+
+# -*- makefile -*-
+
+# Test names.
+tests/threads_TESTS = $(addprefix tests/threads/,		\
+mlfqs-nice-2 mlfqs-nice-10)
+
+# Sources for tests.
+tests/threads_SRC  = tests/threads/tests.c
+tests/threads_SRC += tests/threads/mlfqs-recent-1.c
+tests/threads_SRC += tests/threads/mlfqs-fair.c
+
+MLFQS_OUTPUTS = 				\
+tests/threads/mlfqs-nice-2.output		\
+tests/threads/mlfqs-nice-10.output		\
