@@ -100,7 +100,7 @@ struct thread
 
     /* needed for mlfqs mode*/
     int nice;
-    int recent_cpu;
+    int64_t recent_cpu;
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 

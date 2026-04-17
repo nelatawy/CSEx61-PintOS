@@ -22,7 +22,7 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-#define DEBUG false
+#define DEBUG true
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -61,7 +61,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
-int load_avg;
+int64_t load_avg;
 
 bool thread_mlfqs;
 
@@ -173,10 +173,10 @@ thread_tick (void)
       thread_foreach(recompute_recent_cpu, NULL);
 
     }else{
-      t->recent_cpu += 100; // since it keeps track of 100x the recent cpu so an increment is +100
+      t->recent_cpu = add_fixed_int(t->recent_cpu, 1); // since it keeps track of 100x the recent cpu so an increment is +100
       if (DEBUG)
       {
-        printf("incrementing recent cpu of %s to %d\n",t->name, t->recent_cpu);
+        // printf("incrementing recent cpu of %s to %d\n",t->name, t->recent_cpu);
       }
     }
 
@@ -519,7 +519,7 @@ thread_get_nice (void)
 int
 thread_get_load_avg (void) 
 {
-  return (load_avg)?load_avg : 0;
+  return (load_avg)?round_fixed(mult_fixed_int(load_avg, 100)) : 0;
 }
 
 void 
@@ -527,27 +527,21 @@ recompute_load_avg(void)
 {
   
   // debug_backtrace();
-  // if (DEBUG)
-  //     {
-  //       printf("recomputing load avg\n");
-  //       printf("ready list size %d\n", list_size(&ready_list));
-  //       // printf("prev part of load avg %d\n", fixed_p_to_int(prev_part));
-  //       // printf("curr part of load avg %d\n", fixed_p_to_int(curr_part));
-  //       printf(" load avg %d\n", load_avg);
-  //       // debug_backtrace();
-  //     }
-  int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(load_avg),100);
-  int64_t prev_part = mult_fixed_int(
-      fixed_load_avg,59
-    );
+  if (DEBUG)
+      {
+        // printf("recomputing load avg\n");
+        // printf("ready list size %d\n", list_size(&ready_list));
+        // printf("prev part of load avg %d\n", fixed_p_to_int(prev_part));
+        // printf("curr part of load avg %d\n", fixed_p_to_int(curr_part));
+        // printf(" load avg %ld\n", load_avg);
+        // debug_backtrace();
+      }
+  // int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(load_avg),100);
+  int64_t numer = add_fixed_int(mult_fixed_int(load_avg,59), (thread_current() != idle_thread));
 
-  int64_t curr_part = int_to_fixed_p(list_size(&ready_list) + (thread_current() != idle_thread));
+  // int64_t curr_part = int_to_fixed_p(list_size(&ready_list) + (thread_current() != idle_thread));
 
-  load_avg = round_fixed(
-    mult_fixed_int(
-      div_fixed_int(add_fixed_fixed(prev_part, curr_part),60)
-    ,100)
-  );
+  load_avg = div_fixed_int(numer,60);
   
 }
 
@@ -556,7 +550,7 @@ int
 thread_get_recent_cpu (void) 
 {
   struct thread *cur = thread_current ();
-  return (cur->recent_cpu)?cur->recent_cpu : 0;
+  return (cur->recent_cpu)?round_fixed(mult_fixed_int(cur->recent_cpu, 100)) : 0;
 }
 
 void 
@@ -564,26 +558,26 @@ recompute_recent_cpu(struct thread* t)
 { 
 
   // debug_backtrace();
-  int64_t load_avg_fixed = div_fixed_int(int_to_fixed_p(load_avg),100); 
+  // int64_t load_avg_fixed = div_fixed_int(int_to_fixed_p(load_avg),100); 
   // since it was multiplied by 100
 
-  int64_t decay_factor = div_fixed_fixed(
-    mult_fixed_int(load_avg_fixed,2), 
-    add_fixed_int(mult_fixed_int(load_avg_fixed,2),1)
-  );
-  int64_t old_recent_cpu = div_fixed_int(int_to_fixed_p(t->recent_cpu), 100); 
+  int64_t decay_coeff = mult_fixed_int(load_avg,2*1000);
 
-  int val = round_fixed(
-    mult_fixed_int(
-      add_fixed_int(
-        mult_fixed_fixed(decay_factor, old_recent_cpu),
-        // old_recent_cpu,
-        t->nice
-      ), 
-      100));
+
+  int64_t denom = add_fixed_int(decay_coeff,1000);
+
+  int64_t decay_factor = div_fixed_fixed(decay_coeff, denom);
+
+  int64_t recent_part = mult_fixed_fixed(decay_factor, t->recent_cpu);
+
+
+
+
+  int64_t val =  add_fixed_int(recent_part, t->nice);
       if (DEBUG)
       { 
-        printf("old recent_cpu of %s is %d and 100x load avg factor is %d, 100x decay factor fixed\n\n",t->name, t->recent_cpu, round_fixed(mult_fixed_int(decay_factor, 100)));
+        // printf("old load avg is %s  %ld %ld and decay f is %d\n",t->name, t->recent_cpu, load_avg, round_fixed(mult_fixed_int(decay_factor, 100)));
+        printf("recent part %ld\n\n", recent_part);
 
       }
       t->recent_cpu = val;
