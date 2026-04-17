@@ -93,8 +93,6 @@ static tid_t allocate_tid (void);
 void
 thread_init (void) 
 { 
-  
-  // printf("Threads starting\n\n");
 
   ASSERT (intr_get_level () == INTR_OFF);
 
@@ -108,11 +106,6 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();  
-  if (DEBUG)
-  {
-    printf("created initial thread");
-  }
-  
   if (thread_mlfqs){
     load_avg = 0;
     initial_thread->recent_cpu = 0;
@@ -166,48 +159,18 @@ thread_tick (void)
     if (timer_ticks() % TIMER_FREQ == 0) // multiples of a second
     {
       //recompute the system/thread metrics
-      // printf("Updating load avg\n\n");
-        if (DEBUG)
-      {
-        // printf("recomputing load avg from %d\n", load_avg);
-      }
       recompute_load_avg();
-        if (DEBUG)
-      {
-        // printf("recomputed load avg to %d\n", load_avg);
-      }
       thread_foreach(recompute_recent_cpu, NULL);
 
     }else{
       t->recent_cpu = add_fixed_int(t->recent_cpu, 1); // since it keeps track of 100x the recent cpu so an increment is +100
-      if (DEBUG)
-      {
-        // printf("incrementing recent cpu of %s to %d\n",t->name, t->recent_cpu);
-      }
     }
-
-    // if (timer_ticks() % (2*TIMER_FREQ) == 0 && DEBUG)
-    // {
-    //   printf("recent_cpu * 100 : %d, load avg * 100 : %d\n", t->recent_cpu, load_avg);
-    // }
     
     if (timer_ticks() % 4 == 0) //every fourth tick
     {
-
       thread_foreach(update_dynamic_priority, NULL);
       list_sort(&ready_list, thread_priority_greater, NULL);
-      // thread_foreach(thread_reinsert_in_current_list, NULL); // to correct the order
       thread_maybe_yield();
-      // if (!list_empty(&ready_list))
-      // {
-      //   struct thread *next_ready = list_entry (list_front(&ready_list), struct thread, elem);
-      //   if (DEBUG)
-      //   {
-      //     // printf("rescheduling to %s\n", next_ready->name);
-      //   }
-      //   if (thread_priority_greater(next_ready, t,NULL))
-      //     intr_yield_on_return(); // to preempt current
-      // }
     }
   }
   
@@ -259,17 +222,10 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-  if (DEBUG)
-  {
-    // printf("creating a thread\n");
-  }
+
   
   if (thread_mlfqs)
   {
-     if (DEBUG)
-      {
-        // printf("inhereting recent cpu\n\n");
-      }
     struct thread* parent_thread = thread_current();
     t->recent_cpu = parent_thread->recent_cpu;
     t->priority = PRI_MAX + 1; 
@@ -482,15 +438,6 @@ thread_get_priority (void)
 void 
 update_dynamic_priority(struct thread* t)
 { 
-  //  if (DEBUG)
-  //     {
-  //       printf("recomputing dynamic priority\n\n");
-  //     }
-  // debug_backtrace();
-  // if (DEBUG)
-  // {
-  //   printf("recent cpu is %d\n by %s", t->recent_cpu, t->name);
-  // }
   
   int64_t recent_cpu_effect = div_fixed_int(
     t->recent_cpu,
@@ -525,8 +472,7 @@ thread_get_nice (void)
 }
 
 /* Returns 100 times the system load average. */
-/*load_avg = (59/60)*load_avg + (1/60)*ready_threads*/
-/*load_avg * 100 = ((59 * 5)/3)*load_avg + (5/3)*ready_threads*/
+/* load_avg = (59/60)*load_avg + (1/60)*ready_threads*/
 int
 thread_get_load_avg (void) 
 {
@@ -536,22 +482,7 @@ thread_get_load_avg (void)
 void 
 recompute_load_avg(void)
 {
-  
-  // debug_backtrace();
-  if (DEBUG)
-      {
-        // printf("recomputing load avg\n");
-        // printf("ready list size %d\n", list_size(&ready_list));
-        // printf("prev part of load avg %d\n", fixed_p_to_int(prev_part));
-        // printf("curr part of load avg %d\n", fixed_p_to_int(curr_part));
-        // printf(" load avg %d\n", round_fixed(mult_fixed_int(load_avg,100)));
-        // printf("%ds", timer_ticks() / TIMER_FREQ);
-        // debug_backtrace();
-      }
-  // int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(load_avg),100);
   int64_t numer = add_fixed_int(mult_fixed_int(load_avg,59),list_size(&ready_list) + (thread_current() != idle_thread));
-
-  // int64_t curr_part = int_to_fixed_p(list_size(&ready_list) + (thread_current() != idle_thread));
 
   load_avg = div_fixed_int(numer,60);
   
@@ -569,10 +500,6 @@ void
 recompute_recent_cpu(struct thread* t)
 { 
 
-  // debug_backtrace();
-  // int64_t load_avg_fixed = div_fixed_int(int_to_fixed_p(load_avg),100); 
-  // since it was multiplied by 100
-
   int64_t decay_coeff = mult_fixed_int(load_avg,2*1000);
 
 
@@ -586,12 +513,6 @@ recompute_recent_cpu(struct thread* t)
 
 
   int64_t val =  (t->nice >= 0)? add_fixed_int(recent_part, t->nice) : sub_fixed_int(recent_part, -t->nice) ;
-      if (DEBUG)
-      { 
-        // printf("old load avg is %s  %ld %ld and decay f is %d\n",t->name, t->recent_cpu, load_avg, round_fixed(mult_fixed_int(decay_factor, 100)));
-        // printf("mult part %lld, nice is %d\n\n", mult_fixed_fixed(decay_factor, t->recent_cpu), t->nice);
-
-      }
       t->recent_cpu = val;
 }
 
