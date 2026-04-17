@@ -190,18 +190,8 @@ void test_fixed_point(void) {
     int round_0_quarter = round_fixed(f0_quarter);
     if (round_0_quarter == 0) { printf("  0.25 rounds to 0 [PASS]\n"); pass_count++; } 
     else { printf("  0.25 rounds to %d [FAIL]\n", round_0_quarter); fail_count++; }
-    
 
     /* Test 25: custom */
-    // printf("\nTest 25: custom (2*0.57 / (2*0.57 + 1))\n");
-    // int64_t numer = div_fixed_int(int_to_fixed_p(36),50);  
-    // int64_t denom = add_fixed_int(div_fixed_int(int_to_fixed_p(36),50),1);
-    // int64_t old_rec = div_fixed_int(int_to_fixed_p(16693),100); 
-    // int64_t factor = div_fixed_fixed(numer, denom);
-    // printf("Result = %d\n", round_fixed(mult_fixed_int(mult_fixed_fixed(factor, old_rec), 100)));
-    
-
-        /* Test 25: custom */
     printf("\nTest 25: custom (2*0.57 / (2*0.57 + 1))\n");
     int64_t fixed_load_avg = div_fixed_int(int_to_fixed_p(70),100);
     int64_t res = div_fixed_int(
@@ -210,23 +200,9 @@ void test_fixed_point(void) {
 
     int64_t curr_part = int_to_fixed_p(1);
 
-    // int64_t res = 
-    //     div_fixed_int(
-    //     mult_fixed_int(add_fixed_fixed(prev_part, curr_part),100)
-    //     ,60);
-    // );
-    // int64_t res = add_fixed_fixed(prev_part, curr_part);
-    printf("Result = %ld\n", round_fixed(res));
-    
-
 
     printf("\n=== TEST SUMMARY ===\n");
     printf("Passed: %d\n", pass_count);
     printf("Failed: %d\n", fail_count);
     printf("Total:  %d\n\n", pass_count + fail_count);
 }
-
-
-// int main(){
-//     test_fixed_point();
-// }
