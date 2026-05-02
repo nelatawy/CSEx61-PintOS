@@ -33,8 +33,8 @@ syscall_init (void)
 	 store it in a newly defined variable of the 
 	 given name */
 #define GET_ARGUMENT(type, name)\
-	type name = *(type *)f->esp;
-	f->esp += sizeof(type);\
+	type name = *(type *)f->esp;\
+	f->esp += sizeof(type);
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
