@@ -4,6 +4,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
 typedef int pid_t;
 
@@ -29,10 +30,19 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+/* Checks if the given pointer is a valid user pointer, and exits if not */
+static void check_pointer(const void *pointer) {
+	/* For a pointer to be valid, it must not be null, it must be in user space, and it must be mapped to a page */
+	if (pointer == NULL || !is_user_vaddr(pointer) || pagedir_get_page(thread_current()->pagedir, pointer) == NULL) {
+		exit(-1);
+	}
+}
+
 /* Get the next argument of the given type and 
 	 store it in a newly defined variable of the 
 	 given name */
 #define GET_ARGUMENT(type, name)\
+	check_pointer(f->esp);\
 	type name = *(type *)f->esp;\
 	f->esp += sizeof(type);
 
@@ -57,6 +67,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 			/* Get the arguments from the stack */
 			GET_ARGUMENT(const char *, cmd_line);
 
+			/* Check arguments */
+			check_pointer(cmd_line);
+
 			/* Execute the system call */
 			pid_t pid = exec(cmd_line);
 		} break;
@@ -75,6 +88,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(const char *, file);
 			GET_ARGUMENT(unsigned, initial_size);
 
+			/* Check arguments */
+			check_pointer(file);
+
 			/* Execute the system call */
 			bool success = create(file, initial_size);
 
@@ -85,6 +101,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 			/* Get the arguments from the stack */
 			GET_ARGUMENT(const char *, file);
 
+			/* Check arguments */
+			check_pointer(file);
+
 			/* Execute the system call */
 			bool success = remove(file);
 
@@ -94,6 +113,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 		case SYS_OPEN: {
 			/* Get the arguments from the stack */
 			GET_ARGUMENT(const char *, file);
+
+			/* Check arguments */
+			check_pointer(file);
 
 			/* Execute the system call */
 			int fd = open(file);
@@ -117,6 +139,9 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(void *, buffer);
 			GET_ARGUMENT(unsigned, size);
 
+			/* Check arguments */
+			check_pointer(buffer);
+
 			/* Execute the system call */
 			int bytes_read = read(fd, buffer, size);
 
@@ -129,8 +154,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(const void *, buffer);
 			GET_ARGUMENT(unsigned, size);
 
-			f->esp += sizeof(unsigned);
-			unsigned size = *(unsigned *)f->esp;
+			/* Check arguments */
+			check_pointer(buffer);
 
 			/* Execute the system call */
 			int bytes_written = write(fd, buffer, size);
@@ -160,14 +185,12 @@ syscall_handler (struct intr_frame *f UNUSED)
 			/* Get the arguments from the stack */
 			GET_ARGUMENT(int, fd);
 
-			int fd = *(int *)f->esp;
-
 			/* Execute the system call */
 			close(fd);
 		} break;
 		default: {
 			printf ("Unknown system call: %d\n", systcall_number);
-			thread_exit ();
+			exit(-1);
 		}
 	}
 }
