@@ -33,14 +33,14 @@ syscall_init (void)
 	 store it in a newly defined variable of the 
 	 given name */
 #define GET_ARGUMENT(type, name)\
-	f->esp += sizeof(type);\
 	type name = *(type *)f->esp;
+	f->esp += sizeof(type);\
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
 	/* Get the system call number */
-	int systcall_number = *(int *)f->esp;
+	GET_ARGUMENT(int, systcall_number);
 
 	switch (systcall_number) {
 		case SYS_HALT: {
