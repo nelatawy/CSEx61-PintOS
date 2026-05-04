@@ -274,5 +274,21 @@ tell(int fd)
 static void 
 close(int fd)
 {
+	struct thread *cur = thread_current ();
+    struct list_elem *e;
+
+    for (e = list_begin (&cur->fd_table);
+         e != list_end (&cur->fd_table);
+         e = list_next (e))
+    {
+        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
+        if (entry->fd == fd)
+        {
+            list_remove (e);
+            file_close (entry->file);
+            free (entry);
+            return;
+        }
+    }
 
 }
