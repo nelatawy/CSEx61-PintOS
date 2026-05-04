@@ -4,7 +4,7 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/init.h"
+#include "devices/shutdown.h"
 
 typedef int pid_t;
 
@@ -182,7 +182,25 @@ halt(void)
 static void 
 exit(int status)
 {
+	struct thread* current_thread = thread_current();
+	printf("%s: exit(%d)\n", current_thread->name, status);
 
+    struct list_elem *e;
+    while (!list_empty (&current_thread->fd_table))
+    {
+        e = list_pop_front (&current_thread->fd_table);
+        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
+        file_close (entry->file);
+        free (entry);
+    }
+
+	if (current_thread->executable != NULL)
+	{
+		file_allow_write (current_thread->executable);
+		file_close (current_thread->executable);
+	}
+
+	thread_exit();
 }
 
 static pid_t
@@ -212,6 +230,14 @@ remove(const char *file)
 static int 
 open(const char *file)
 {
+	struct file *f = filesys_open (file);
+	struct thread* cur = thread_current();
+
+	struct fd_entry *entry = malloc (sizeof (struct fd_entry));
+	entry->fd = cur->next_fd++;
+	entry->file = f;
+	list_push_back (&cur->fd_table, &entry->elem);
+
 	return -1;
 }
 
