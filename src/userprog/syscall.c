@@ -230,14 +230,8 @@ remove(const char *file)
 static int 
 open(const char *file)
 {
-	struct file *f = filesys_open (file);
-	struct thread* current_thread = thread_current();
-
-	struct fd_entry *entry = malloc (sizeof (struct fd_entry));
-	entry->fd = current_thread->next_fd++;
-	entry->file = f;
-	list_push_back (&current_thread->fd_table, &entry->elem);
-
+	//// TODO: add the file to the process FD table
+	//// NOTE: FD table is in struct thread in "threads.h"
 	return -1;
 }
 
@@ -274,21 +268,6 @@ tell(int fd)
 static void 
 close(int fd)
 {
-	struct thread *cur = thread_current ();
-    struct list_elem *e;
-
-    for (e = list_begin (&cur->fd_table);
-         e != list_end (&cur->fd_table);
-         e = list_next (e))
-    {
-        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
-        if (entry->fd == fd)
-        {
-            list_remove (e);
-            file_close (entry->file);
-            free (entry);
-            return;
-        }
-    }
-
+	//// TODO: remove the file from the process FD table
+	//// NOTE: FD table is in struct thread in "threads.h"
 }
