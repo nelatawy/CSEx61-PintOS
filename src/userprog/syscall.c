@@ -231,12 +231,12 @@ static int
 open(const char *file)
 {
 	struct file *f = filesys_open (file);
-	struct thread* cur = thread_current();
+	struct thread* current_thread = thread_current();
 
 	struct fd_entry *entry = malloc (sizeof (struct fd_entry));
-	entry->fd = cur->next_fd++;
+	entry->fd = current_thread->next_fd++;
 	entry->file = f;
-	list_push_back (&cur->fd_table, &entry->elem);
+	list_push_back (&current_thread->fd_table, &entry->elem);
 
 	return -1;
 }
