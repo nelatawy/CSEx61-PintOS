@@ -5,6 +5,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "devices/shutdown.h"
 
 typedef int pid_t;
 
@@ -198,13 +199,31 @@ syscall_handler (struct intr_frame *f UNUSED)
 static void 
 halt(void)
 {
-
+	shutdown_power_off();
 }
 
 static void 
 exit(int status)
 {
+	struct thread* current_thread = thread_current();
+	printf("%s: exit(%d)\n", current_thread->name, status);
 
+    struct list_elem *e;
+    while (!list_empty (&current_thread->fd_table))
+    {
+        e = list_pop_front (&current_thread->fd_table);
+        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
+        file_close (entry->file);
+        free (entry);
+    }
+
+	if (current_thread->executable != NULL)
+	{
+		file_allow_write (current_thread->executable);
+		file_close (current_thread->executable);
+	}
+
+	thread_exit();
 }
 
 static pid_t
@@ -234,6 +253,8 @@ remove(const char *file)
 static int 
 open(const char *file)
 {
+	//// TODO: add the file to the process FD table
+	//// NOTE: FD table is in struct thread in "threads.h"
 	return -1;
 }
 
@@ -270,5 +291,6 @@ tell(int fd)
 static void 
 close(int fd)
 {
-
+	//// TODO: remove the file from the process FD table
+	//// NOTE: FD table is in struct thread in "threads.h"
 }
