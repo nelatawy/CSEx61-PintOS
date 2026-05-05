@@ -95,7 +95,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			check_pointer(cmd_line);
 
 			/* Execute the system call */
-			pid_t pid = exec(cmd_line);
+			f->eax = exec(cmd_line);
 		} break;
 		case SYS_WAIT: {
 			/* Get the arguments from the stack */
