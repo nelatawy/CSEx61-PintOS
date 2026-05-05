@@ -16,7 +16,10 @@
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
+
+#include "userprog/syscall.h"
 
 /* Used for setup_stack */
 static void push_stack(int order, void **esp, char *token, char **argv, int argc);
@@ -109,6 +112,29 @@ process_exit (void)
 	struct thread *cur = thread_current ();
 	uint32_t *pd;
 
+	/* we must free the opened file table instances */
+	struct list_elem *e;
+    while (!list_empty (&cur->fd_table))
+    {
+        e = list_pop_front (&cur->fd_table);
+        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
+        file_close(entry->file);
+        free (entry);
+    }
+
+	/*  we must also release the acquired mutexes even if the critical object is an unstable
+	 an unstable state can be better than a system wide hang/deadlock */
+
+	while (!list_empty (&cur->acquired_locks))
+    {
+        e = list_pop_front (&cur->acquired_locks);
+        struct lock_entry *entry = list_entry (e, struct lock_entry, elem);
+        lock_release(&entry->lock);
+		// we free the lock_entry in lock_release
+		// note that : we are freeing the entry not the lock itself
+		// because some other thread might need it or maybe it's a global lock
+    }
+
 	/* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
 	pd = cur->pagedir;
@@ -124,6 +150,12 @@ process_exit (void)
 		cur->pagedir = NULL;
 		pagedir_activate (NULL);
 		pagedir_destroy (pd);
+	}
+
+	if (cur->executable != NULL)
+	{
+		file_allow_write (cur->executable);
+		file_close (cur->executable);
 	}
 }
 
