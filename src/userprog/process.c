@@ -133,8 +133,16 @@ ct->load_success=success;
 
 	/* If load failed, quit. */
 	if (!success){
-		thread_exit ();
-		
+		printf("%s: exit(%d)\n", thread_current()->name, -1);
+		if (ct != NULL)
+		{
+			ct->exit_status = -1;
+			ct->has_exited = true;
+			sema_up(&ct->exit_sema);
+			if (ct->orphaned)
+				free(ct);
+		}
+		thread_exit();
 	}
 
 	/* Start the user process by simulating a return from an
@@ -186,6 +194,7 @@ process_exit (void)
 	struct thread *cur = thread_current ();
 	uint32_t *pd;
 
+	enum intr_level old_level = intr_disable();
 	while (!list_empty(&cur->children))
 	{
 		struct list_elem *e = list_pop_front(&cur->children);
@@ -195,6 +204,7 @@ process_exit (void)
 		else
 			ct->orphaned = true;
 	}
+	intr_set_level(old_level);
 
 	struct list_elem *e;
 	while (!list_empty(&cur->fd_table))
