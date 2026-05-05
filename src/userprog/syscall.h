@@ -16,6 +16,8 @@ struct lock_entry {
     struct list_elem elem;
 };
 
+void exit_failure(void);
+
 void syscall_init (void);
 
 #endif /* userprog/syscall.h */

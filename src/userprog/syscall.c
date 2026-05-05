@@ -42,11 +42,15 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+void exit_failure(void) {
+	exit(-1);
+}
+
 /* Checks if the given pointer is a valid user pointer, and exits if not */
 static void check_pointer(const void *pointer) {
 	/* For a pointer to be valid, it must not be null, it must be in user space, and it must be mapped to a page */
 	if (pointer == NULL || !is_user_vaddr(pointer) || pagedir_get_page(thread_current()->pagedir, pointer) == NULL) {
-		exit(-1);
+		exit_failure();
 	}
 }
 
