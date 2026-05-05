@@ -43,13 +43,15 @@ static void check_pointer(const void *pointer) {
 	 store it in a newly defined variable of the 
 	 given name */
 #define GET_ARGUMENT(type, name)\
-	check_pointer(f->esp);\
-	type name = *(type *)f->esp;\
-	f->esp += sizeof(type);
+	check_pointer(esp);\
+	type name = *(type *)esp;\
+	esp += sizeof(type);
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+	void *esp = f->esp;
+
 	/* Get the system call number */
 	GET_ARGUMENT(int, systcall_number);
 
