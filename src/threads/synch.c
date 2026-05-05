@@ -203,7 +203,7 @@ lock_acquire (struct lock *lock)
   lock->holder = curr_thread;
 
   struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-  l_entry->lock = &lock; 
+  l_entry->lock = lock; 
   // to add the lock to the list of acquired locks of the thread
   // necessary for post-kill cleanup
   list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
@@ -229,7 +229,7 @@ lock_try_acquire (struct lock *lock)
     lock->holder = curr_thread;
 
     struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-    l_entry->lock = &lock; 
+    l_entry->lock = lock; 
     list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
   }
     
