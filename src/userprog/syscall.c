@@ -50,11 +50,17 @@ static void check_pointer(const void *pointer) {
 	}
 }
 
+static void check_buffer(const void *buffer, unsigned size) {
+	for (unsigned i = 0; i < size; i++) {
+		check_pointer(buffer + i);
+	}
+}
+
 /* Get the next argument of the given type and 
 	 store it in a newly defined variable of the 
 	 given name */
 #define GET_ARGUMENT(type, name)\
-	check_pointer(esp);\
+	check_buffer(esp, sizeof(type));\
 	type name = *(type *)esp;\
 	esp += sizeof(type);
 
@@ -154,7 +160,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(unsigned, size);
 
 			/* Check arguments */
-			check_pointer(buffer);
+			check_buffer(buffer, size);
 
 			/* Execute the system call */
 			int bytes_read = read(fd, buffer, size);
@@ -169,7 +175,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(unsigned, size);
 
 			/* Check arguments */
-			check_pointer(buffer);
+			check_buffer(buffer, size);
 
 			/* Execute the system call */
 			int bytes_written = write(fd, buffer, size);
