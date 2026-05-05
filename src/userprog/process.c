@@ -75,7 +75,7 @@ struct exec_helper helper;
 
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, start_process, &helper);
+	tid = thread_create (prog_name, PRI_DEFAULT, start_process, &helper);
 
 /*take tid of the child thread*/
 	ct->child_id = tid;
