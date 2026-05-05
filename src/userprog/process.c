@@ -57,13 +57,17 @@ if (ct == NULL) return TID_ERROR;
 	/* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
 	fn_copy = palloc_get_page (0);
-	if (fn_copy == NULL)
+	if (fn_copy == NULL){
+	free(ct);
 		return TID_ERROR;
+	}
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	/* Parsed file name */
 	char *save_ptr;
-	file_name = strtok_r((char *) file_name, " ", &save_ptr);
+char name_buf[256];
+    strlcpy(name_buf, fn_copy, sizeof(name_buf));
+    char *prog_name = strtok_r(name_buf, " ", &save_ptr);//strtok_r work on buffer name and not change the orgianl file name 
 
 struct exec_helper helper;
     helper.file_name = fn_copy;
