@@ -206,7 +206,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 static struct file*
 get_file(int fd){
 	struct list_elem* itr = list_begin(&thread_current()->fd_table);
-	while (itr != NULL)
+	while (itr != list_end(&thread_current()->fd_table))
 	{
 		struct fd_entry* entry = list_entry(itr, struct fd_entry, elem);
 		if (entry->fd == fd)
@@ -276,22 +276,29 @@ static int
 open(const char *file)
 {
 	#ifdef USERPROG
-
 	struct thread* curr_thread = thread_current();
 
 	lock_acquire(&file_lock);
 	// so that if something wrong happens we can release the lock even if the thread was killed
 
 	struct file* opened_f = filesys_open(file);
+	if (opened_f == NULL)
+	{
+		lock_release(&file_lock);
+		return -1;
+	}
+
 	struct fd_entry* f_entry = calloc(1, sizeof (struct fd_entry));
 
 	f_entry->file = opened_f;
 	f_entry->fd = curr_thread->next_fd++;
 	list_push_front(&curr_thread->fd_table, &f_entry->elem);
 
+	int fd = f_entry->fd;
 	lock_release(&file_lock);// releases the lock + removes it from the acquired_locks listZZZ
 	// it wasnt killed and the file open was completed, we can now release the file lock
 		
+	return fd;
 	#endif
 	return -1;
 }
@@ -413,7 +420,7 @@ close(int fd)
 	#ifdef USERPROG
 	struct thread* curr = thread_current();
 	struct list_elem* itr = list_begin(&curr->fd_table);
-	while (itr != NULL)
+	while (itr != list_end(&curr->fd_table))
 	{
 		struct fd_entry* entry = list_entry(itr, struct fd_entry, elem);
 		if (entry->fd == fd)
@@ -425,6 +432,7 @@ close(int fd)
 			free(entry); //deallocate the entry
 			
 			lock_release(&file_lock);
+			return;
 		}
 		itr = list_next(itr);
 	}

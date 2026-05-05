@@ -251,7 +251,7 @@ lock_release (struct lock *lock)
   struct thread* curr_thread = thread_current();
   sema_up (&lock->semaphore);
   struct list_elem* itr = list_begin(&curr_thread->acquired_locks);
-  while (itr != NULL)
+  while (itr != list_end(&curr_thread->acquired_locks))
   {
     struct lock_entry* entry = list_entry(itr, struct lock_entry, elem);
     if (entry->lock == lock)
