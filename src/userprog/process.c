@@ -181,10 +181,7 @@ process_exit (void)
     {
         e = list_front (&cur->acquired_locks);
         struct lock_entry *entry = list_entry (e, struct lock_entry, elem);
-        lock_release(&entry->lock);
-		// we free the lock_entry in lock_release
-		// note that : we are freeing the entry not the lock itself
-		// because some other thread might need it or maybe it's a global lock
+        lock_release(entry->lock);
     }
 
 	/* Destroy the current process's page directory and switch back
@@ -409,18 +406,8 @@ load (const char *file_name, void (**eip) (void), void **esp, char **save_ptr)
 	success = true;
 
 	done:
-	/* We arrive here whether the load is successful or not. */
-//we not close it to still put protection on it 
-/*
-where we must close it in process exit not here to make the file in protection until the temination of process 
-
-*/
-	if(success){
-		t->exec_file=file;
-	}
-	else{
-	file_close (file);
-}
+	if (!success && file != NULL)
+		file_close(file);
 	return success;
 }
 

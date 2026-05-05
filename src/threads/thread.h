@@ -103,8 +103,6 @@ struct thread
    uint8_t *stack;            /* Saved stack pointer. */
    int priority;              /* Priority. */
    struct list_elem allelem;  /* List element for all threads list. */
-
-   struct file *exec_file; // to save the file in load method
                            /*
                            notice this list
                            is used in wait after wait make successfully we must delete the child from this and access it by thread identifier
@@ -116,7 +114,7 @@ struct thread
                            and in wait just free and delete from list  but focus must delete before free
                         
                            */
-   struct list children;   /*list of all childeren status of this process */
+   struct list children;   /*list of all children status of this process */
 
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
