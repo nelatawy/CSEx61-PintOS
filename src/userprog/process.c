@@ -376,7 +376,17 @@ load (const char *file_name, void (**eip) (void), void **esp, char **save_ptr)
 
 	done:
 	/* We arrive here whether the load is successful or not. */
+//we not close it to still put protection on it 
+/*
+where we must close it in process exit not here to make the file in protection until the temination of process 
+
+*/
+	if(success){
+		t->exec_file=file;
+	}
+	else{
 	file_close (file);
+}
 	return success;
 }
 
