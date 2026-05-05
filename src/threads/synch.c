@@ -204,11 +204,9 @@ lock_acquire (struct lock *lock)
   lock->holder = curr_thread;
 
 #ifdef USERPROG
-  struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-  l_entry->lock = lock;
   // to add the lock to the list of acquired locks of the thread
   // necessary for post-kill cleanup
-  list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
+  list_push_front(&curr_thread->acquired_locks, &lock->elem);
 #endif
 }
 
@@ -231,11 +229,9 @@ lock_try_acquire (struct lock *lock)
     struct thread* curr_thread = thread_current();
     lock->holder = curr_thread;
 
-#ifdef USERPROG
-    struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-    l_entry->lock = lock;
-    list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
-#endif
+    #ifdef USERPROG
+    list_push_front(&curr_thread->acquired_locks, &lock->elem);
+    #endif
   }
     
   return success;
@@ -259,11 +255,10 @@ lock_release (struct lock *lock)
   struct list_elem* itr = list_begin(&curr_thread->acquired_locks);
   while (itr != list_end(&curr_thread->acquired_locks))
   {
-    struct lock_entry* entry = list_entry(itr, struct lock_entry, elem);
-    if (entry->lock == lock)
+    struct lock* entry = list_entry(itr, struct lock, elem);
+    if (entry == lock)
     {
       list_remove(itr);
-      free(entry); // we free the entry not the lock itself
       break;
     }
     itr = list_next(itr);
