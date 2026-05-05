@@ -449,7 +449,10 @@ load (const char *file_name, void (**eip) (void), void **esp, char **save_ptr)
 
 	done:
 	if (!success && file != NULL)
+	{
 		file_close(file);
+		thread_current()->executable = NULL;
+	}
 	return success;
 }
 
