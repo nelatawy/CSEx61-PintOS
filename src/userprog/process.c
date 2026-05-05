@@ -92,9 +92,14 @@ struct exec_helper helper;
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *aux)
 {
-	char *file_name = file_name_;
+	/*we now send not just file name but also pointer to ct */
+  struct exec_helper *helper = aux;
+  char *file_name = helper->file_name;
+  struct child_status *ct = helper->ct;
+
+
 	struct intr_frame if_;
 	bool success;
 
@@ -109,10 +114,19 @@ start_process (void *file_name_)
 	if_.eflags = FLAG_IF | FLAG_MBS;
 	success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
 
-	/* If load failed, quit. */
+	/*update the laod success in ct */
+ct->load_success=success;
+
+	//we make free for page of parent send it to send the name of file not pages of child
 	palloc_free_page (file_name);
-	if (!success)
+
+		sema_up(&ct->load_success);
+
+	/* If load failed, quit. */
+	if (!success){
 		thread_exit ();
+		
+	}
 
 	/* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
