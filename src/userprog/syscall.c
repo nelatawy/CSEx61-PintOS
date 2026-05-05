@@ -251,7 +251,10 @@ exit(int status)
 static pid_t
 exec(const char *cmd_line)
 {
-	return -1;
+tid_t tid = process_execute(cmd_line);
+
+    return tid;
+
 }
 
 static int 
