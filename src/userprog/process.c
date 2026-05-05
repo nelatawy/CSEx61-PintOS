@@ -245,8 +245,8 @@ process_exit (void)
 
 	if (cur->executable != NULL)
 	{
-		file_allow_write (cur->executable);
 		file_close (cur->executable);
+		cur->executable = NULL;
 	}
 }
 
