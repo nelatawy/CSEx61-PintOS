@@ -33,12 +33,17 @@ process_execute (const char *file_name)
 {
 /*create child status*/
 struct child_status *ct = malloc(sizeof(struct child_status));
+//check create succeffully 
+if (ct == NULL) return TID_ERROR;
+
 /*make load =false we not yet load thing */
 ct->load_success = false;
 /*intialize semaphore parent will wait on it */
 sema_init(&ct->load_sema, 0); 
 /*add to list of parent */
-list_push_back (&thread_current ()->children, &ct->elem);
+
+
+
 	char *fn_copy;
 	tid_t tid;
 
@@ -53,16 +58,20 @@ list_push_back (&thread_current ()->children, &ct->elem);
 	char *save_ptr;
 	file_name = strtok_r((char *) file_name, " ", &save_ptr);
 
+struct exec_helper helper;
+    helper.file_name = fn_copy;
+    helper.ct = ct;
 
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+	tid = thread_create (file_name, PRI_DEFAULT, start_process, &helper);
 
 /*take tid of the child thread*/
 	ct->child_id = tid;
 
 
 	if (tid == TID_ERROR){
+				free(ct);
 		palloc_free_page (fn_copy);
 	return tid;
 	}
@@ -70,8 +79,13 @@ list_push_back (&thread_current ()->children, &ct->elem);
 	sema_down(&ct->load_sema);
 /*mean the child not load successfully*/
 	if(!ct->load_success){
+				free(ct);
+
 		return -1;
 	}
+	/*push this success created and loaded  child  */
+	list_push_back (&thread_current ()->children, &ct->elem);
+
 	return tid;
 }
 

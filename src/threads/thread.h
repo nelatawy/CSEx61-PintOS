@@ -105,7 +105,17 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+/*
+notice this list 
+is used in wait after wait make successfully we must delete the child from this and access it by thread identifier
+just after wait make free to object and remove it from list 
 
+in process exit he need to process terminate and it have child >> will be orphan 
+but the list of proccess have object of child status in heap we must free them so in procee exit we must make free to them 
+
+and in wait just free and delete from list  but focus must delete before free  
+
+*/
     struct list children;              /*list of all childeren status of this process */
 
 #ifdef USERPROG

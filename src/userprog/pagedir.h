@@ -7,7 +7,7 @@
 /*this helper to can send to thread create the file_name and also the pointer to cp */
 struct exec_helper {
     const char *file_name;    
-    struct child_status *cp;  
+    struct child_status *ct;  
 };
 
 uint32_t *pagedir_create (void);
