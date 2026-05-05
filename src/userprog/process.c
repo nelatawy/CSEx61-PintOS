@@ -41,9 +41,12 @@ struct child_status *ct = malloc(sizeof(struct child_status));
 if (ct == NULL) return TID_ERROR;
 
 /*make load =false we not yet load thing */
-ct->load_success = false;
-/*intialize semaphore parent will wait on it */
-sema_init(&ct->load_sema, 0); 
+	ct->load_success = false;
+	ct->has_exited = false;
+	ct->orphaned = false;
+	ct->exit_status = -1;
+	sema_init(&ct->load_sema, 0);
+	sema_init(&ct->exit_sema, 0);
 /*add to list of parent */
 
 
@@ -103,6 +106,8 @@ start_process (void *aux)
   char *file_name = helper->file_name;
   struct child_status *ct = helper->ct;
 
+  thread_current()->self_ct = ct;
+
 
 	struct intr_frame if_;
 	bool success;
@@ -152,8 +157,25 @@ ct->load_success=success;
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid)
 {
+	struct thread *cur = thread_current();
+	struct list_elem *e;
+
+	for (e = list_begin(&cur->children); e != list_end(&cur->children); )
+	{
+		struct child_status *ct = list_entry(e, struct child_status, elem);
+		if (ct->child_id == child_tid)
+		{
+			list_remove(e);
+			sema_down(&ct->exit_sema);
+			int status = ct->exit_status;
+			free(ct);
+			return status;
+		}
+		e = list_next(e);
+	}
+
 	return -1;
 }
 
@@ -164,25 +186,31 @@ process_exit (void)
 	struct thread *cur = thread_current ();
 	uint32_t *pd;
 
-	/* we must free the opened file table instances */
+	while (!list_empty(&cur->children))
+	{
+		struct list_elem *e = list_pop_front(&cur->children);
+		struct child_status *ct = list_entry(e, struct child_status, elem);
+		if (ct->has_exited)
+			free(ct);
+		else
+			ct->orphaned = true;
+	}
+
 	struct list_elem *e;
-    while (!list_empty (&cur->fd_table))
-    {
-        e = list_pop_front (&cur->fd_table);
-        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
-        file_close(entry->file);
-        free (entry);
-    }
+	while (!list_empty(&cur->fd_table))
+	{
+		e = list_pop_front(&cur->fd_table);
+		struct fd_entry *entry = list_entry(e, struct fd_entry, elem);
+		file_close(entry->file);
+		free(entry);
+	}
 
-	/*  we must also release the acquired mutexes even if the critical object is an unstable
-	 an unstable state can be better than a system wide hang/deadlock */
-
-	while (!list_empty (&cur->acquired_locks))
-    {
-        e = list_front (&cur->acquired_locks);
-        struct lock_entry *entry = list_entry (e, struct lock_entry, elem);
-        lock_release(entry->lock);
-    }
+	while (!list_empty(&cur->acquired_locks))
+	{
+		e = list_front(&cur->acquired_locks);
+		struct lock_entry *entry = list_entry(e, struct lock_entry, elem);
+		lock_release(entry->lock);
+	}
 
 	/* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

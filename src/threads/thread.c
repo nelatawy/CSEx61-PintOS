@@ -473,6 +473,7 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->priority = priority;
 
 	list_init(&t->children);
+	t->self_ct = NULL;
 	
 	t->magic = THREAD_MAGIC;
 

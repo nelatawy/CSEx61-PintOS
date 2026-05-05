@@ -10,6 +10,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
 
@@ -232,9 +233,18 @@ halt(void)
 static void 
 exit(int status)
 {
-	struct thread* current_thread = thread_current();
-	printf("%s: exit(%d)\n", current_thread->name, status);
-    // cleanup logic moved to 'userprog/process.c' in process_exit()
+	struct thread* cur = thread_current();
+	printf("%s: exit(%d)\n", cur->name, status);
+
+	if (cur->self_ct != NULL)
+	{
+		cur->self_ct->exit_status = status;
+		cur->self_ct->has_exited = true;
+		sema_up(&cur->self_ct->exit_sema);
+		if (cur->self_ct->orphaned)
+			free(cur->self_ct);
+	}
+
 	thread_exit();
 }
 
@@ -247,7 +257,7 @@ exec(const char *cmd_line)
 static int 
 wait(pid_t pid)
 {
-	return -1;
+	return process_wait(pid);
 }
 
 static bool 

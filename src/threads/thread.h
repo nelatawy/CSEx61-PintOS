@@ -91,6 +91,11 @@ struct child_status
    struct semaphore load_sema;
    /*this tell us the load happend successfully or not */
    bool load_success;
+
+   int exit_status;
+   bool has_exited;
+   bool orphaned;
+   struct semaphore exit_sema;
    struct list_elem elem;
 };
 
@@ -115,6 +120,7 @@ struct thread
                         
                            */
    struct list children;   /*list of all children status of this process */
+   struct child_status *self_ct;
 
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
