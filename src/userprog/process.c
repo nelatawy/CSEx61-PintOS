@@ -31,6 +31,14 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp, char** s
 tid_t
 process_execute (const char *file_name) 
 {
+/*create child status*/
+struct child_status *ct = malloc(sizeof(struct child_status));
+/*make load =false we not yet load thing */
+ct->load_success = false;
+/*intialize semaphore parent will wait on it */
+sema_init(&ct->load_sema, 0); 
+/*add to list of parent */
+list_push_back (&thread_current ()->children, &ct->elem);
 	char *fn_copy;
 	tid_t tid;
 
@@ -45,13 +53,25 @@ process_execute (const char *file_name)
 	char *save_ptr;
 	file_name = strtok_r((char *) file_name, " ", &save_ptr);
 
+
+
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
 
-sema_down()
+/*take tid of the child thread*/
+	ct->child_id = tid;
 
-	if (tid == TID_ERROR)
+
+	if (tid == TID_ERROR){
 		palloc_free_page (fn_copy);
+	return tid;
+	}
+	/*make parent wait on semaphore */
+	sema_down(&ct->load_sema);
+/*mean the child not load successfully*/
+	if(!ct->load_success){
+		return -1;
+	}
 	return tid;
 }
 

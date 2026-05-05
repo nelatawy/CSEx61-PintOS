@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*this helper to can send to thread create the file_name and also the pointer to cp */
+struct exec_helper {
+    const char *file_name;    
+    struct child_status *cp;  
+};
+
 uint32_t *pagedir_create (void);
 void pagedir_destroy (uint32_t *pd);
 bool pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool rw);

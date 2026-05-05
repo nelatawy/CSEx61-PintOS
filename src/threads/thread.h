@@ -88,7 +88,7 @@ struct child_status{
 /*parent wait on it */
    struct semaphore load_sema;
 /*this tell us the load happend successfully or not */
-   int load_success;
+   bool load_success;
    struct list_elem elem;
 };
 
