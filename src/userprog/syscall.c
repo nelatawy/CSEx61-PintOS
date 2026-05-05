@@ -60,6 +60,12 @@ static void check_buffer(const void *buffer, unsigned size) {
 	}
 }
 
+static void check_string(const char *string) {
+	do {
+		check_pointer(string);
+	} while (*string++ != '\0');
+}
+
 /* Get the next argument of the given type and 
 	 store it in a newly defined variable of the 
 	 given name */
@@ -92,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(const char *, cmd_line);
 
 			/* Check arguments */
-			check_pointer(cmd_line);
+			check_string(cmd_line);
 
 			/* Execute the system call */
 			f->eax = exec(cmd_line);
@@ -113,7 +119,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(unsigned, initial_size);
 
 			/* Check arguments */
-			check_pointer(file);
+			check_string(file);
 
 			/* Execute the system call */
 			bool success = create(file, initial_size);
@@ -126,7 +132,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(const char *, file);
 
 			/* Check arguments */
-			check_pointer(file);
+			check_string(file);
 
 			/* Execute the system call */
 			bool success = remove(file);
@@ -139,7 +145,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 			GET_ARGUMENT(const char *, file);
 
 			/* Check arguments */
-			check_pointer(file);
+			check_string(file);
 
 			/* Execute the system call */
 			int fd = open(file);
