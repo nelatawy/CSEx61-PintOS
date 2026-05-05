@@ -34,6 +34,19 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp, char** s
 tid_t
 process_execute (const char *file_name) 
 {
+/*create child status*/
+struct child_status *ct = malloc(sizeof(struct child_status));
+//check create succeffully 
+if (ct == NULL) return TID_ERROR;
+
+/*make load =false we not yet load thing */
+ct->load_success = false;
+/*intialize semaphore parent will wait on it */
+sema_init(&ct->load_sema, 0); 
+/*add to list of parent */
+
+
+
 	char *fn_copy;
 	tid_t tid;
 
@@ -48,19 +61,48 @@ process_execute (const char *file_name)
 	char *save_ptr;
 	file_name = strtok_r((char *) file_name, " ", &save_ptr);
 
+struct exec_helper helper;
+    helper.file_name = fn_copy;
+    helper.ct = ct;
+
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-	if (tid == TID_ERROR)
+	tid = thread_create (file_name, PRI_DEFAULT, start_process, &helper);
+
+/*take tid of the child thread*/
+	ct->child_id = tid;
+
+
+	if (tid == TID_ERROR){
+				free(ct);
 		palloc_free_page (fn_copy);
+	return tid;
+	}
+	/*make parent wait on semaphore */
+	sema_down(&ct->load_sema);
+/*mean the child not load successfully*/
+	if(!ct->load_success){
+				free(ct);
+
+		return -1;
+	}
+	/*push this success created and loaded  child  */
+	list_push_back (&thread_current ()->children, &ct->elem);
+
 	return tid;
 }
 
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void *aux)
 {
-	char *file_name = file_name_;
+	/*we now send not just file name but also pointer to ct */
+  struct exec_helper *helper = aux;
+  char *file_name = helper->file_name;
+  struct child_status *ct = helper->ct;
+
+
 	struct intr_frame if_;
 	bool success;
 
@@ -75,10 +117,19 @@ start_process (void *file_name_)
 	if_.eflags = FLAG_IF | FLAG_MBS;
 	success = load (file_name, &if_.eip, &if_.esp, &save_ptr);
 
-	/* If load failed, quit. */
+	/*update the laod success in ct */
+ct->load_success=success;
+
+	//we make free for page of parent send it to send the name of file not pages of child
 	palloc_free_page (file_name);
-	if (!success)
+
+		sema_up(&ct->load_success);
+
+	/* If load failed, quit. */
+	if (!success){
 		thread_exit ();
+		
+	}
 
 	/* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -358,7 +409,17 @@ load (const char *file_name, void (**eip) (void), void **esp, char **save_ptr)
 
 	done:
 	/* We arrive here whether the load is successful or not. */
+//we not close it to still put protection on it 
+/*
+where we must close it in process exit not here to make the file in protection until the temination of process 
+
+*/
+	if(success){
+		t->exec_file=file;
+	}
+	else{
 	file_close (file);
+}
 	return success;
 }
 
