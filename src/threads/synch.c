@@ -29,6 +29,7 @@
 #include "threads/synch.h"
 #include <stdio.h>
 #include <string.h>
+#include "threads/malloc.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/syscall.h"
@@ -202,11 +203,13 @@ lock_acquire (struct lock *lock)
   struct thread* curr_thread = thread_current();
   lock->holder = curr_thread;
 
+#ifdef USERPROG
   struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-  l_entry->lock = lock; 
+  l_entry->lock = lock;
   // to add the lock to the list of acquired locks of the thread
   // necessary for post-kill cleanup
   list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
+#endif
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -228,9 +231,11 @@ lock_try_acquire (struct lock *lock)
     struct thread* curr_thread = thread_current();
     lock->holder = curr_thread;
 
+#ifdef USERPROG
     struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
-    l_entry->lock = lock; 
+    l_entry->lock = lock;
     list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
+#endif
   }
     
   return success;
@@ -250,6 +255,7 @@ lock_release (struct lock *lock)
 
   struct thread* curr_thread = thread_current();
   sema_up (&lock->semaphore);
+#ifdef USERPROG
   struct list_elem* itr = list_begin(&curr_thread->acquired_locks);
   while (itr != list_end(&curr_thread->acquired_locks))
   {
@@ -257,11 +263,12 @@ lock_release (struct lock *lock)
     if (entry->lock == lock)
     {
       list_remove(itr);
-      free(itr); // we free the entry not the lock itself
+      free(entry); // we free the entry not the lock itself
       break;
     }
     itr = list_next(itr);
   }
+#endif
    
 }
 

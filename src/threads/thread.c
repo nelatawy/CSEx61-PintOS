@@ -483,12 +483,7 @@ init_thread (struct thread *t, const char *name, int priority)
 		list_init (&t->fd_table);
 		t->executable = NULL;
 		t->next_fd = 2;
-		
-		struct list* acquired_lock_list = calloc(1, sizeof (struct list));
-		struct list* fd_list = calloc(1, sizeof (struct list));
-	
-		list_init(&fd_list);
-		list_init(&acquired_lock_list);
+		list_init (&t->acquired_locks);
 	#endif
 
 	old_level = intr_disable ();

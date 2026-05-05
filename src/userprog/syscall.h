@@ -1,6 +1,10 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+#include <list.h>
+#include "filesys/file.h"
+#include "threads/synch.h"
+
 struct fd_entry {
     int fd;
     struct file *file;

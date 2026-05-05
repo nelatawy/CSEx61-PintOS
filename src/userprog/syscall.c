@@ -1,7 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdbool.h>
-#include <malloc.h>
+#include "threads/malloc.h"
 #include <syscall-nr.h>
 #include "filesys/filesys.h"
 #include "filesys/file.h"
@@ -9,6 +9,7 @@
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 #include "devices/shutdown.h"
 #include "devices/input.h"
 
@@ -36,6 +37,7 @@ struct lock file_lock;
 void
 syscall_init (void) 
 {
+  lock_init(&file_lock);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -251,26 +253,20 @@ wait(pid_t pid)
 static bool 
 create(const char *file, unsigned initial_size)
 {	
-	#ifdef USERPROG
 	lock_acquire(&file_lock);
 	bool success = filesys_create(file, initial_size);
 	lock_release(&file_lock);
 
 	return success;
-	#endif USERPROG
-	return false;
 }
 
 static bool 
 remove(const char *file)
 {
-	#ifdef USERPROG
 	lock_acquire(&file_lock);
 	bool success = filesys_remove(file);
 	lock_release(&file_lock);
 	return success;
-	#endif
-	return false;
 }
 
 /*This method should only be called from a USERPROG because otherwise it will return -1
@@ -278,7 +274,6 @@ remove(const char *file)
 static int 
 open(const char *file)
 {
-	#ifdef USERPROG
 	struct thread* curr_thread = thread_current();
 
 	lock_acquire(&file_lock);
@@ -302,36 +297,33 @@ open(const char *file)
 	// it wasnt killed and the file open was completed, we can now release the file lock
 		
 	return fd;
-	#endif
-	return -1;
 }
 
 static int 
 filesize(int fd)
 {	
-	#ifdef USERPROG
 	if (fd == 0 || fd == 1)
 		return -1;
 	
-	struct file* f = get_file(fd); 
+	struct file* f = get_file(fd);
 	// no need to acquire 'file_lock' for this since we add push at the front of the list
 	// so no next pointer ever gets modified and is in an unstable state
 	lock_acquire(&file_lock);
 	if(f == NULL)
+	{
+		lock_release(&file_lock);
 		return 0; // this fd doesn't exist
+	}
 
 	int len = file_length(f);
 	lock_release(&file_lock);
 
 	return len;
-	#endif
-	return -1;
 }
 
 static int //note that size is limited to int max value
 read(int fd, void *buffer, unsigned size)
 {
-	#ifdef USERPROG
 	if (fd == 0)
 	{
 		// read from keyboard one byte at a time using input_getc()
@@ -353,14 +345,11 @@ read(int fd, void *buffer, unsigned size)
 	lock_release(&file_lock);
 
 	return bytes_read;
-	#endif
-	return -1;
 }
 
 static int 
 write(int fd, const void *buffer, unsigned size)
 {	
-	#ifdef USERPROG
 	if (fd == 1)
 	{
 		// write to console — break into chunks to prevent interleaving
@@ -389,51 +378,48 @@ write(int fd, const void *buffer, unsigned size)
 	lock_release(&file_lock);
 
 	return bytes_written;
-	#endif
-	return -1;
 }
 
 static void 
 seek(int fd, unsigned position)
 {	
-	#ifdef USERPROG
-	if (fd == 0 || fd == 1) 
-        return -1; // STDIN,STDOUT are not random access
-    
+	if (fd == 0 || fd == 1)
+		return; // STDIN,STDOUT are not random access
+
 	struct file* f = get_file(fd);
 	lock_acquire(&file_lock);
 	if (f == NULL)
-		return -1;
-	
+	{
+		lock_release(&file_lock);
+		return;
+	}
+
 	file_seek(f, position);
 	lock_release(&file_lock);
-	#endif
 }
 
 static unsigned 
 tell(int fd)
 {	
-	#ifdef USERPROG
-	if (fd == 0 || fd == 1) 
-        return 0; // STDIN,STDOUT are not random access
-    
+	if (fd == 0 || fd == 1)
+		return 0; // STDIN,STDOUT are not random access
+
 	struct file* f = get_file(fd);
 	lock_acquire(&file_lock);
 	if (f == NULL)
+	{
+		lock_release(&file_lock);
 		return 0;
+	}
 	unsigned pos = file_tell(f);
 	lock_release(&file_lock);
 
 	return pos;
-	#endif
-
-	return 0;
 }
 
 static void 
 close(int fd)
 {	
-	#ifdef USERPROG
 	struct thread* curr = thread_current();
 	struct list_elem* itr = list_begin(&curr->fd_table);
 	while (itr != list_end(&curr->fd_table))
@@ -452,5 +438,4 @@ close(int fd)
 		}
 		itr = list_next(itr);
 	}
-	#endif
 }

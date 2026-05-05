@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/synch.h"
+#include "threads/malloc.h"
 #include "threads/vaddr.h"
 
 #include "userprog/syscall.h"
@@ -123,7 +124,7 @@ ct->load_success=success;
 	//we make free for page of parent send it to send the name of file not pages of child
 	palloc_free_page (file_name);
 
-		sema_up(&ct->load_success);
+		sema_up(&ct->load_sema);
 
 	/* If load failed, quit. */
 	if (!success){
@@ -178,7 +179,7 @@ process_exit (void)
 
 	while (!list_empty (&cur->acquired_locks))
     {
-        e = list_pop_front (&cur->acquired_locks);
+        e = list_front (&cur->acquired_locks);
         struct lock_entry *entry = list_entry (e, struct lock_entry, elem);
         lock_release(&entry->lock);
 		// we free the lock_entry in lock_release
