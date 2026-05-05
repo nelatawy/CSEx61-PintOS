@@ -10,6 +10,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 
 typedef int pid_t;
 
@@ -331,18 +332,21 @@ read(int fd, void *buffer, unsigned size)
 	#ifdef USERPROG
 	if (fd == 0)
 	{
-		//TODO: handle the behavior relating STDIN
-		return 0;
+		// read from keyboard one byte at a time using input_getc()
+		uint8_t *buf = (uint8_t *) buffer;
+		for (unsigned i = 0; i < size; i++)
+			buf[i] = input_getc();
+		return (int) size;
 	}
 	
 	if (fd == 1)
-        return -1; // STDOUT is write-only
-    
+		return -1; // STDOUT is write-only
+
 	struct file* f = get_file(fd);
-	lock_acquire(&file_lock);
 	if (f == NULL)
-		return -1;
-	
+		return -1; // invalid fd, no lock to release
+
+	lock_acquire(&file_lock);
 	int bytes_read = (int)file_read(f, buffer, size);
 	lock_release(&file_lock);
 
@@ -357,21 +361,31 @@ write(int fd, const void *buffer, unsigned size)
 	#ifdef USERPROG
 	if (fd == 1)
 	{
-		//TODO: handle the behavior relating STDOUT
-		return 0;
+		// write to console — break into chunks to prevent interleaving
+		const size_t CHUNK = 512;
+		size_t remaining = size;
+		const char *buf = (const char *) buffer;
+		while (remaining > CHUNK)
+		{
+			putbuf(buf, CHUNK);
+			buf += CHUNK;
+			remaining -= CHUNK;
+		}
+		putbuf(buf, remaining);
+		return (int) size;
 	}
 
-	if (fd == 0) 
-        return -1; // STDIN is read-only
-    
+	if (fd == 0)
+		return -1; // STDIN is read-only
+
 	struct file* f = get_file(fd);
-	lock_acquire(&file_lock);
 	if (f == NULL)
-		return -1;
-	
+		return -1; // invalid fd, no lock to release
+
+	lock_acquire(&file_lock);
 	int bytes_written = (int)file_write(f, buffer, size);
 	lock_release(&file_lock);
-	
+
 	return bytes_written;
 	#endif
 	return -1;
