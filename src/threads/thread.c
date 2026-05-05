@@ -8,6 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
@@ -291,7 +292,7 @@ thread_exit (void)
 	ASSERT (!intr_context ());
 
 #ifdef USERPROG
-	process_exit ();
+	process_exit (); // this is where resources are freed
 #endif
 
 	/* Remove thread from all threads list, set our status to dying,
@@ -476,6 +477,12 @@ init_thread (struct thread *t, const char *name, int priority)
 		list_init (&t->fd_table);
 		t->executable = NULL;
 		t->next_fd = 2;
+		
+		struct list* acquired_lock_list = calloc(1, sizeof (struct list));
+		struct list* fd_list = calloc(1, sizeof (struct list));
+	
+		list_init(&fd_list);
+		list_init(&acquired_lock_list);
 	#endif
 
 	old_level = intr_disable ();

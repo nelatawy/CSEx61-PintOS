@@ -1,9 +1,13 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <malloc.h>
 #include <syscall-nr.h>
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "devices/shutdown.h"
 
@@ -24,6 +28,9 @@ static int write(int fd, const void *buffer, unsigned size);
 static void seek(int fd, unsigned position);
 static unsigned tell(int fd);
 static void close(int fd);
+
+struct lock file_lock;
+
 
 void
 syscall_init (void) 
@@ -196,6 +203,21 @@ syscall_handler (struct intr_frame *f UNUSED)
 	}
 }
 
+static struct file*
+get_file(int fd){
+	struct list_elem* itr = list_begin(&thread_current()->fd_table);
+	while (itr != NULL)
+	{
+		struct fd_entry* entry = list_entry(itr, struct fd_entry, elem);
+		if (entry->fd == fd)
+		{
+			return entry->file;
+		}
+		itr = list_next(itr);
+	}
+	return NULL;
+}
+
 static void 
 halt(void)
 {
@@ -207,22 +229,7 @@ exit(int status)
 {
 	struct thread* current_thread = thread_current();
 	printf("%s: exit(%d)\n", current_thread->name, status);
-
-    struct list_elem *e;
-    while (!list_empty (&current_thread->fd_table))
-    {
-        e = list_pop_front (&current_thread->fd_table);
-        struct fd_entry *entry = list_entry (e, struct fd_entry, elem);
-        file_close (entry->file);
-        free (entry);
-    }
-
-	if (current_thread->executable != NULL)
-	{
-		file_allow_write (current_thread->executable);
-		file_close (current_thread->executable);
-	}
-
+    // cleanup logic moved to 'userprog/process.c' in process_exit()
 	thread_exit();
 }
 
@@ -240,57 +247,186 @@ wait(pid_t pid)
 
 static bool 
 create(const char *file, unsigned initial_size)
-{
+{	
+	#ifdef USERPROG
+	lock_acquire(&file_lock);
+	bool success = filesys_create(file, initial_size);
+	lock_release(&file_lock);
+
+	return success;
+	#endif USERPROG
 	return false;
 }
 
 static bool 
 remove(const char *file)
 {
+	#ifdef USERPROG
+	lock_acquire(&file_lock);
+	bool success = filesys_remove(file);
+	lock_release(&file_lock);
+	return success;
+	#endif
 	return false;
 }
 
+/*This method should only be called from a USERPROG because otherwise it will return -1
+  So for the kernel, it should directly call the filesys_open*/
 static int 
 open(const char *file)
 {
-	//// TODO: add the file to the process FD table
-	//// NOTE: FD table is in struct thread in "threads.h"
+	#ifdef USERPROG
+
+	struct thread* curr_thread = thread_current();
+
+	lock_acquire(&file_lock);
+	// so that if something wrong happens we can release the lock even if the thread was killed
+
+	struct file* opened_f = filesys_open(file);
+	struct fd_entry* f_entry = calloc(1, sizeof (struct fd_entry));
+
+	f_entry->file = opened_f;
+	f_entry->fd = curr_thread->next_fd++;
+	list_push_front(&curr_thread->fd_table, &f_entry->elem);
+
+	lock_release(&file_lock);// releases the lock + removes it from the acquired_locks listZZZ
+	// it wasnt killed and the file open was completed, we can now release the file lock
+		
+	#endif
 	return -1;
 }
 
 static int 
 filesize(int fd)
-{
-	return 0;
+{	
+	#ifdef USERPROG
+	if (fd == 0 || fd == 1)
+		return -1;
+	
+	struct file* f = get_file(fd); 
+	// no need to acquire 'file_lock' for this since we add push at the front of the list
+	// so no next pointer ever gets modified and is in an unstable state
+	lock_acquire(&file_lock);
+	if(f == NULL)
+		return 0; // this fd doesn't exist
+
+	int len = file_length(f);
+	lock_release(&file_lock);
+
+	return len;
+	#endif
+	return -1;
 }
 
-static int 
+static int //note that size is limited to int max value
 read(int fd, void *buffer, unsigned size)
 {
-	return 0;
+	#ifdef USERPROG
+	if (fd == 0)
+	{
+		//TODO: handle the behavior relating STDIN
+		return 0;
+	}
+	
+	if (fd == 1)
+        return -1; // STDOUT is write-only
+    
+	struct file* f = get_file(fd);
+	lock_acquire(&file_lock);
+	if (f == NULL)
+		return -1;
+	
+	int bytes_read = (int)file_read(f, buffer, size);
+	lock_release(&file_lock);
+
+	return bytes_read;
+	#endif
+	return -1;
 }
 
 static int 
 write(int fd, const void *buffer, unsigned size)
-{
-	return 0;
+{	
+	#ifdef USERPROG
+	if (fd == 1)
+	{
+		//TODO: handle the behavior relating STDOUT
+		return 0;
+	}
+
+	if (fd == 0) 
+        return -1; // STDIN is read-only
+    
+	struct file* f = get_file(fd);
+	lock_acquire(&file_lock);
+	if (f == NULL)
+		return -1;
+	
+	int bytes_written = (int)file_write(f, buffer, size);
+	lock_release(&file_lock);
+	
+	return bytes_written;
+	#endif
+	return -1;
 }
 
 static void 
 seek(int fd, unsigned position)
-{
-
+{	
+	#ifdef USERPROG
+	if (fd == 0 || fd == 1) 
+        return -1; // STDIN,STDOUT are not random access
+    
+	struct file* f = get_file(fd);
+	lock_acquire(&file_lock);
+	if (f == NULL)
+		return -1;
+	
+	file_seek(f, position);
+	lock_release(&file_lock);
+	#endif
 }
 
 static unsigned 
 tell(int fd)
-{
+{	
+	#ifdef USERPROG
+	if (fd == 0 || fd == 1) 
+        return 0; // STDIN,STDOUT are not random access
+    
+	struct file* f = get_file(fd);
+	lock_acquire(&file_lock);
+	if (f == NULL)
+		return 0;
+	unsigned pos = file_tell(f);
+	lock_release(&file_lock);
+
+	return pos;
+	#endif
+
 	return 0;
 }
 
 static void 
 close(int fd)
-{
-	//// TODO: remove the file from the process FD table
-	//// NOTE: FD table is in struct thread in "threads.h"
+{	
+	#ifdef USERPROG
+	struct thread* curr = thread_current();
+	struct list_elem* itr = list_begin(&curr->fd_table);
+	while (itr != NULL)
+	{
+		struct fd_entry* entry = list_entry(itr, struct fd_entry, elem);
+		if (entry->fd == fd)
+		{	
+			lock_acquire(&file_lock);
+			
+			file_close(entry->file);
+			list_remove(itr); // removes the fd_entry from the list
+			free(entry); //deallocate the entry
+			
+			lock_release(&file_lock);
+		}
+		itr = list_next(itr);
+	}
+	#endif
 }

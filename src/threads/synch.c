@@ -31,6 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/syscall.h"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -197,7 +198,15 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
+
+  struct thread* curr_thread = thread_current();
+  lock->holder = curr_thread;
+
+  struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
+  l_entry->lock = &lock; 
+  // to add the lock to the list of acquired locks of the thread
+  // necessary for post-kill cleanup
+  list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -215,8 +224,15 @@ lock_try_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
   success = sema_try_down (&lock->semaphore);
-  if (success)
-    lock->holder = thread_current ();
+  if (success){
+    struct thread* curr_thread = thread_current();
+    lock->holder = curr_thread;
+
+    struct lock_entry* l_entry = calloc(1, sizeof (struct lock_entry));
+    l_entry->lock = &lock; 
+    list_push_front(&curr_thread->acquired_locks, &l_entry->elem);
+  }
+    
   return success;
 }
 
@@ -230,9 +246,23 @@ lock_release (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
-
   lock->holder = NULL;
+
+  struct thread* curr_thread = thread_current();
   sema_up (&lock->semaphore);
+  struct list_elem* itr = list_begin(&curr_thread->acquired_locks);
+  while (itr != NULL)
+  {
+    struct lock_entry* entry = list_entry(itr, struct lock_entry, elem);
+    if (entry->lock == lock)
+    {
+      list_remove(itr);
+      free(itr); // we free the entry not the lock itself
+      break;
+    }
+    itr = list_next(itr);
+  }
+   
 }
 
 /* Returns true if the current thread holds LOCK, false

@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <pthread.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -93,14 +94,16 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-#ifdef USERPROG
+// #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 
     struct list fd_table;
     struct file *executable;
     int next_fd;
-#endif
+
+    struct list acquired_locks; //needed so that before a process is killed the lock must be released
+// #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
